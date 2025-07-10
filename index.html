@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en" class="">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- KaTeX for LaTeX rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" xintegrity="sha384-n8MVd4RsNIU0KOVEMQNogPDUEaQfkfgL4l3bgYgtmLkc2Q2ifxCNVcqTrX4adQEG" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" xintegrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+    
+    <!-- highlight.js for code syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    
+    <!-- marked.js for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <script>
+        // Set theme on initial load
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark')
+        } else {
+            document.documentElement.classList.remove('dark')
+        }
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chat-history::-webkit-scrollbar { width: 6px; }
+        .chat-history::-webkit-scrollbar-track { background: #f1f1f1; }
+        .dark .chat-history::-webkit-scrollbar-track { background: #2d3748; }
+        .chat-history::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
+        .chat-history::-webkit-scrollbar-thumb:hover { background: #555; }
+        
+        @keyframes typing-dot {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1.0); }
+        }
+        .typing-dot { animation: typing-dot 1.4s infinite ease-in-out both; }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        /* Styles for code blocks */
+        .ai-message pre {
+            background-color: #282c34;
+            color: #abb2bf;
+            padding: 0;
+            border-radius: 8px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 14px;
+            position: relative;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #21252b;
+            padding: 8px 12px;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            color: #9da5b4;
+            font-size: 12px;
+        }
+        .code-header button {
+            background-color: #353a42;
+            color: #9da5b4;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+        }
+        .code-header button:hover {
+            background-color: #40454f;
+        }
+        .ai-message pre code.hljs {
+            padding: 1rem;
+            border-radius: 0 0 8px 8px;
+        }
+        .ai-message .katex {
+            font-size: 1.1em;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 flex items-center justify-center min-h-screen transition-colors duration-300">
+
+    <div id="chatbot" class="flex flex-col w-full max-w-3xl h-[90vh] bg-white dark:bg-gray-800 rounded-2xl shadow-2xl">
+        <!-- Header -->
+        <header class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex items-center space-x-3">
+                 <div class="p-2 bg-blue-500 rounded-full">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707.707M12 21v-1"></path></svg>
+                </div>
+                <h1 class="text-xl font-bold text-gray-800 dark:text-white">AI Assistant</h1>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button id="theme-toggle" class="p-2 text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">
+                    <svg id="theme-icon-light" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M12 12a5 5 0 100-10 5 5 0 000 10z"></path></svg>
+                    <svg id="theme-icon-dark" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                </button>
+                <button id="new-chat-btn" class="flex items-center px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 transition-colors duration-200 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                    New Chat
+                </button>
+            </div>
+        </header>
+
+        <!-- Chat History -->
+        <div id="chat-history" class="flex-1 p-6 overflow-y-auto chat-history">
+            <!-- Initial Welcome Message -->
+            <div id="initial-view">
+                 <div class="flex items-start gap-3 mb-6">
+                    <div class="p-2 bg-blue-500 rounded-full flex-shrink-0">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707.707M12 21v-1"></path></svg>
+                    </div>
+                    <div class="relative max-w-xl px-4 py-3 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-r-lg rounded-bl-lg group ai-message">
+                        <p>Hello! I can help you with code, math, and more. Try one of the suggestions below or ask me anything!</p>
+                    </div>
+                </div>
+                <!-- Suggestions -->
+                <div id="suggestions" class="grid grid-cols-1 sm:grid-cols-2 gap-4 my-6">
+                    <button class="suggestion-btn text-left p-4 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors">
+                        <p class="font-semibold text-gray-800 dark:text-gray-200">Explain quantum computing</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">in simple terms</p>
+                    </button>
+                     <button class="suggestion-btn text-left p-4 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors">
+                        <p class="font-semibold text-gray-800 dark:text-gray-200">Write a Python script</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">to merge two CSV files</p>
+                    </button>
+                     <button class="suggestion-btn text-left p-4 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors">
+                        <p class="font-semibold text-gray-800 dark:text-gray-200">What is the quadratic formula?</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Show me the LaTeX</p>
+                    </button>
+                     <button class="suggestion-btn text-left p-4 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors">
+                        <p class="font-semibold text-gray-800 dark:text-gray-200">Create a React component</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">for a modal dialog</p>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Typing Indicator -->
+        <div id="typing-indicator" class="hidden p-6 pt-0">
+             <div class="flex items-start gap-3">
+                <div class="p-2 bg-blue-500 rounded-full flex-shrink-0">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707.707M12 21v-1"></path></svg>
+                </div>
+                <div class="px-4 py-3 bg-gray-100 dark:bg-gray-700 rounded-r-lg rounded-bl-lg">
+                    <div class="flex items-center justify-center space-x-1">
+                        <div class="w-2 h-2 bg-gray-500 rounded-full typing-dot"></div>
+                        <div class="w-2 h-2 bg-gray-500 rounded-full typing-dot"></div>
+                        <div class="w-2 h-2 bg-gray-500 rounded-full typing-dot"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+            <form id="chat-form" class="flex items-center space-x-4">
+                <button id="attachment-btn" type="button" class="p-3 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                </button>
+                <input id="chat-input" type="text" placeholder="Ask me anything..." autocomplete="off" class="flex-1 w-full px-4 py-3 text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 border border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <button id="send-btn" type="submit" class="p-3 text-white bg-blue-500 rounded-lg shadow-md disabled:bg-blue-300 dark:disabled:bg-blue-800 disabled:cursor-not-allowed hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" disabled>
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                </button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Attachment Feature Modal -->
+    <div id="attachment-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl text-center">
+            <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-2">Feature Not Implemented</h3>
+            <p class="text-gray-600 dark:text-gray-300">File attachment functionality is for demonstration purposes only.</p>
+            <button id="close-modal-btn" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const chatForm = document.getElementById('chat-form');
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-btn');
+        const chatHistory = document.getElementById('chat-history');
+        const typingIndicator = document.getElementById('typing-indicator');
+        const newChatBtn = document.getElementById('new-chat-btn');
+        const themeToggle = document.getElementById('theme-toggle');
+        const lightIcon = document.getElementById('theme-icon-light');
+        const darkIcon = document.getElementById('theme-icon-dark');
+        const initialView = document.getElementById('initial-view');
+        const suggestionBtns = document.querySelectorAll('.suggestion-btn');
+        const attachmentBtn = document.getElementById('attachment-btn');
+        const attachmentModal = document.getElementById('attachment-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+
+        let conversationHistory = [];
+
+        // --- Event Listeners ---
+        chatInput.addEventListener('input', () => {
+            sendBtn.disabled = chatInput.value.trim() === '';
+        });
+
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const userMessage = chatInput.value.trim();
+            if (userMessage) {
+                if (initialView) initialView.classList.add('hidden');
+                appendMessage(userMessage, 'user');
+                chatInput.value = '';
+                sendBtn.disabled = true;
+                fetchAIResponse(userMessage);
+            }
+        });
+        
+        newChatBtn.addEventListener('click', () => {
+            chatHistory.innerHTML = '';
+            if (initialView) {
+                chatHistory.appendChild(initialView);
+                initialView.classList.remove('hidden');
+            }
+            conversationHistory = [];
+        });
+
+        themeToggle.addEventListener('click', () => {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            updateThemeIcon(isDark);
+        });
+
+        suggestionBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const mainText = btn.querySelector('p:first-child').textContent;
+                const subText = btn.querySelector('p:last-child').textContent;
+                const fullText = `${mainText} ${subText}`;
+                chatInput.value = fullText;
+                sendBtn.disabled = false;
+                chatInput.focus();
+                // Optionally, submit directly:
+                // chatForm.dispatchEvent(new Event('submit', { cancelable: true }));
+            });
+        });
+        
+        attachmentBtn.addEventListener('click', () => {
+            attachmentModal.classList.remove('hidden');
+        });
+        
+        closeModalBtn.addEventListener('click', () => {
+            attachmentModal.classList.add('hidden');
+        });
+
+        // --- Core Functions ---
+        function updateThemeIcon(isDark) {
+            lightIcon.classList.toggle('hidden', isDark);
+            darkIcon.classList.toggle('hidden', !isDark);
+        }
+
+        function renderContent(element) {
+            // Render LaTeX
+            const katexElements = element.querySelectorAll('.language-latex');
+            katexElements.forEach(el => {
+                const parent = el.parentNode;
+                const formula = el.textContent;
+                try {
+                    katex.render(formula, parent, { throwOnError: false, displayMode: true });
+                    parent.classList.add('katex-container');
+                    el.remove();
+                } catch (e) {
+                    console.error("KaTeX Error: ", e);
+                    parent.textContent = formula;
+                }
+            });
+
+            // Highlight code blocks
+            element.querySelectorAll('pre code').forEach((block) => {
+                if (!block.classList.contains('hljs')) {
+                    const language = [...block.classList].find(cls => cls.startsWith('language-'))?.replace('language-', '') || 'plaintext';
+                    const pre = block.parentElement;
+                    const header = document.createElement('div');
+                    header.className = 'code-header';
+                    const langSpan = document.createElement('span');
+                    langSpan.textContent = language;
+                    const copyBtn = document.createElement('button');
+                    copyBtn.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> <span>Copy</span>`;
+                    copyBtn.onclick = () => {
+                        navigator.clipboard.writeText(block.textContent).then(() => {
+                            copyBtn.innerHTML = `<span>Copied!</span>`;
+                            setTimeout(() => {
+                                copyBtn.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> <span>Copy</span>`;
+                            }, 2000);
+                        });
+                    };
+                    header.appendChild(langSpan);
+                    header.appendChild(copyBtn);
+                    pre.insertBefore(header, block);
+                    hljs.highlightElement(block);
+                }
+            });
+        }
+
+        function appendMessage(message, sender) {
+            const messageWrapper = document.createElement('div');
+            const messageBubble = document.createElement('div');
+            
+            messageBubble.classList.add('relative', 'max-w-xl', 'px-4', 'py-3', 'rounded-lg');
+
+            if (sender === 'user') {
+                messageWrapper.classList.add('flex', 'justify-end', 'mb-6');
+                messageBubble.classList.add('bg-blue-500', 'text-white', 'rounded-br-none');
+                messageBubble.textContent = message;
+            } else {
+                messageWrapper.classList.add('flex', 'items-start', 'gap-3', 'mb-6');
+                const avatar = document.createElement('div');
+                avatar.classList.add('p-2', 'bg-blue-500', 'rounded-full', 'flex-shrink-0');
+                avatar.innerHTML = `<svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707.707M12 21v-1"></path></svg>`;
+                messageWrapper.appendChild(avatar);
+                
+                messageBubble.classList.add('bg-gray-100', 'dark:bg-gray-700', 'text-gray-800', 'dark:text-gray-200', 'rounded-bl-none', 'ai-message');
+                messageBubble.innerHTML = marked.parse(message);
+                renderContent(messageBubble);
+            }
+
+            messageWrapper.appendChild(messageBubble);
+            chatHistory.appendChild(messageWrapper);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        async function fetchAIResponse(prompt) {
+            typingIndicator.classList.remove('hidden');
+            scrollToBottom();
+            
+            conversationHistory.push({ role: "user", parts: [{ text: prompt }] });
+
+            const payload = { contents: conversationHistory };
+            const apiKey = ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+
+                const result = await response.json();
+                
+                let aiText = "Sorry, I couldn't get a response. Please try again.";
+                if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    aiText = result.candidates[0].content.parts[0].text;
+                } else {
+                     console.warn("Unexpected API response structure:", result);
+                }
+
+                conversationHistory.push({ role: "model", parts: [{ text: aiText }] });
+                
+                typingIndicator.classList.add('hidden');
+                appendMessage(aiText, 'ai');
+
+            } catch (error) {
+                console.error("Error fetching AI response:", error);
+                typingIndicator.classList.add('hidden');
+                appendMessage("Sorry, something went wrong. Please check the console for details.", 'ai');
+            }
+        }
+        
+        // Initial setup
+        updateThemeIcon(document.documentElement.classList.contains('dark'));
+    </script>
+</body>
+</html>
